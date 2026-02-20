@@ -1,0 +1,15 @@
+# Virtual environments
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Databases
+*.db
+
+# Local environment files
+.env
+
+# Generated debug artifacts
+debug_artifacts/

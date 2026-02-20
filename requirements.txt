@@ -1,0 +1,32 @@
+# FastAPI backend
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+
+# WebSockets
+websockets
+
+# Twilio (outbound calls + TwiML)
+twilio
+
+# Deepgram (Streaming STT + TTS)
+deepgram-sdk
+
+# LangChain + Groq (LLM)
+langchain
+langchain-core
+langchain-community
+langchain-groq
+groq
+
+# Memory / DB
+sqlalchemy
+aiosqlite
+
+# Frontend
+streamlit
+requests
+
+# Utilities
+httpx
