@@ -16,12 +16,15 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, Optional
 
+from dotenv import load_dotenv
 from langchain_core.chat_history import InMemoryChatMessageHistory, BaseChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_groq import ChatGroq
+
+load_dotenv()
 
 
 @dataclass
@@ -33,6 +36,7 @@ class CallAgent:
     def __post_init__(self) -> None:
         # One history per CallAgent instance (your main.py already creates one agent per call).
         self._history = InMemoryChatMessageHistory()
+        self._last_usage: Dict[str, Any] = {}
 
         # System message includes the user-provided instructions from Streamlit.
         system_text = (
@@ -85,11 +89,22 @@ class CallAgent:
         session_id is optional; if you pass Twilio CallSid, it will still work.
         """
         sid = session_id or "default"
+        self._last_usage = {}
 
         result = await self._chain.ainvoke(
             {"input": user_text},
             config={"configurable": {"session_id": sid}},
         )
 
+        response_metadata = getattr(result, "response_metadata", {}) or {}
+        usage = getattr(result, "usage_metadata", None)
+        if not usage:
+            usage = response_metadata.get("token_usage") or response_metadata.get("usage")
+        self._last_usage = usage or {}
+
         # ChatGroq returns an AIMessage; its text is in .content
         return getattr(result, "content", str(result))
+
+    @property
+    def last_usage(self) -> Dict[str, Any]:
+        return self._last_usage
