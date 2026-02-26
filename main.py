@@ -192,6 +192,8 @@ async def make_call(payload: Dict[str, Any]):
         "langsmith_run_id": langsmith_run_id,
         "instructions": instructions,
         "to_number": to_number,
+        "last_user_norm": None,
+        "last_assistant_norm": None,
     }
     logger.info(f"/make-call: to_number={to_number} instructions_id={instructions_id}")
 
@@ -245,6 +247,18 @@ async def send_audio_to_twilio(ws: WebSocket, stream_sid: str, audio_bytes: byte
         await asyncio.sleep(0.02)
 
     logger.info(f"send_audio_to_twilio: streamSid={stream_sid} done sent_bytes={sent}")
+
+
+async def send_silence_to_twilio(ws: WebSocket, stream_sid: Optional[str], duration_s: float = 1.0) -> None:
+    if not stream_sid or duration_s <= 0:
+        return
+
+    samples = max(int(8000 * duration_s), 320)
+    silence_audio = bytes([0xFF]) * samples  # 0xFF == silence in mulaw
+    logger.info(
+        f"Injecting silence: streamSid={stream_sid} duration_s={duration_s:.2f} bytes={len(silence_audio)}"
+    )
+    await send_audio_to_twilio(ws, stream_sid, silence_audio)
 
 
 @app.websocket("/media-stream")
@@ -321,8 +335,18 @@ async def media_stream(ws: WebSocket):
                         agent: CallAgent = call_state["agent"]
                         run_id = call_state.get("langsmith_run_id")
 
-                        await log_turn(call_sid, "user", transcript)
-                        log_langsmith_user_transcript(run_id, transcript)
+                        transcript_clean = transcript.strip()
+                        if not transcript_clean:
+                            continue
+
+                        norm_transcript = transcript_clean.lower()
+                        if norm_transcript == call_state.get("last_user_norm"):
+                            logger.info("Skipping duplicate STT final transcript for call_sid=%s", call_sid)
+                            continue
+                        call_state["last_user_norm"] = norm_transcript
+
+                        await log_turn(call_sid, "user", transcript_clean)
+                        log_langsmith_user_transcript(run_id, transcript_clean)
 
                         # LLM timing
                         t0 = time.time()
@@ -366,6 +390,9 @@ async def media_stream(ws: WebSocket):
 
                         if audio and stream_sid:
                             await send_audio_to_twilio(ws, stream_sid, audio)
+                            if response_text.strip().endswith("?"):
+                                await send_silence_to_twilio(ws, stream_sid, duration_s=1.0)
+                            call_state["last_assistant_norm"] = response_text.strip().lower()
                         else:
                             logger.warning(
                                 f"Skipped sending audio. stream_sid={stream_sid} audio_bytes={len(audio)}"
@@ -403,17 +430,7 @@ async def media_stream(ws: WebSocket):
                         f"CALL_STATE missing agent for call_sid={call_sid} instructions_id={instructions_id}"
                     )
 
-                # greet
-                if call_sid and stream_sid:
-                    opening = "Hi! I wanted to schedule an appointment"
-                    await log_turn(call_sid, "assistant", opening)
-
-                    try:
-                        audio = await tts.synthesize_mulaw_8k(opening)
-                        logger.info(f"Greeting TTS bytes={len(audio)}")
-                        await send_audio_to_twilio(ws, stream_sid, audio)
-                    except Exception:
-                        logger.exception("Greeting TTS/send failed")
+                # The assistant now waits for the remote party to speak first; no auto-greeting is sent.
 
             elif etype == "media":
                 payload_b64 = (event.get("media") or {}).get("payload")
