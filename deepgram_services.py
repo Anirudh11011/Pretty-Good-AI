@@ -10,7 +10,9 @@ logger.info("Deepgram key loaded: %s", bool(DEEPGRAM_API_KEY))
 
 DEEPGRAM_LISTEN_WSS = (
     "wss://api.deepgram.com/v1/listen?"
-    "encoding=mulaw&sample_rate=8000&channels=1&punctuate=true&interim_results=true&vad_events=true"
+    "encoding=mulaw&sample_rate=8000&channels=1"
+    "&punctuate=true&interim_results=true&vad_events=true"
+    "&utterance_end_ms=2000&vad_sensitivity=0.2"
 )
 
 DEEPGRAM_SPEAK_URL = (

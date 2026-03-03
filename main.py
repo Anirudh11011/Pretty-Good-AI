@@ -12,7 +12,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import Response, JSONResponse
 
 from dotenv import load_dotenv
-from db import init_db, log_call, log_turn
+from db import init_db, log_call, log_turn, update_call_from_number
 from llm_agent import CallAgent
 from langsmith import Client
 
@@ -414,6 +414,7 @@ async def media_stream(ws: WebSocket):
                 start = event.get("start", {})
                 stream_sid = start.get("streamSid")
                 call_sid = start.get("callSid")
+                from_number = start.get("from") or start.get("caller") or ""
 
                 logger.info(f"Twilio START: call_sid={call_sid} stream_sid={stream_sid} instructions_id={instructions_id}")
 
@@ -429,6 +430,9 @@ async def media_stream(ws: WebSocket):
                     logger.warning(
                         f"CALL_STATE missing agent for call_sid={call_sid} instructions_id={instructions_id}"
                     )
+
+                if call_sid and from_number:
+                    await update_call_from_number(call_sid, from_number)
 
                 # The assistant now waits for the remote party to speak first; no auto-greeting is sent.
 

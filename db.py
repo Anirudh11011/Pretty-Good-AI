@@ -49,3 +49,15 @@ async def log_turn(call_sid: str, role: str, content: str):
             (str(uuid.uuid4()), call_sid, role, content),
         )
         await db.commit()
+
+
+async def update_call_from_number(call_sid: str, from_number: str):
+    if not (call_sid and from_number):
+        return
+
+    async with aiosqlite.connect(SQLITE_PATH) as db:
+        await db.execute(
+            "UPDATE call_logs SET from_number = ? WHERE call_sid = ?",
+            (from_number, call_sid),
+        )
+        await db.commit()
