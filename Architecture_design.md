@@ -71,7 +71,7 @@
 
 This document captures how the current system pieces fit together and the reasoning behind the main architectural decisions. For further questions or modifications, refer to the linked source files above.
 
-## 7. Issues Faced and Solutions
+## 6. Issues Faced and Solutions
 
 - **Main issue**: During live calls, the assistant often responded before the human finished speaking, leading to partial or fragmented transcripts (for example, repeated phrases like "Pivot Point Orthopedic is…" without the full sentence).
 - **Technical root cause**: The Deepgram streaming loop in the FastAPI `/media-stream` endpoint reacted to every STT message marked `is_final=true` as a complete user turn. In practice, Deepgram can emit multiple finals for a single spoken sentence whenever there is a short pause, so the backend treated mid-sentence pauses as full turns and immediately triggered `CallAgent.respond()`, causing the LLM/TTS to talk over the caller and log incomplete text.
